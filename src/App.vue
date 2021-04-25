@@ -1,17 +1,30 @@
 <template>
-  <img alt="Vue logo" src="./assets/logo.png">
-  <HelloWorld msg="Welcome to Your Vue.js App"/>
+  <!-- <img src="./assets/logo.png" /> -->
+  <!-- <SomeIcon /> -->
+  <div>
+    <p>Elevator Excersize</p>
+    <!-- <p>
+      If Element Plus is successfully added to this project, you'll see an
+      <code v-text="'<el-button>'"></code>
+      below
+    </p>
+    <el-button type="primary">el-button</el-button> -->
+  </div>
+  <Layout msg="Welcome to Your Vue.js App" />
 </template>
 
 <script>
-import HelloWorld from './components/HelloWorld.vue'
+// import HelloWorld from "./components/HelloWorld.vue";
+import Layout from "./components/Layout.vue";
+// import SomeIcon from "./assets/SomeIcon";
 
 export default {
-  name: 'App',
+  name: "App",
   components: {
-    HelloWorld
-  }
-}
+    Layout,
+    // SomeIcon,
+  },
+};
 </script>
 
 <style>
