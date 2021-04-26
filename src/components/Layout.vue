@@ -8,19 +8,30 @@
       <br />
       <span  style="font-size: 20px"> queue -> {{ queue }} </span>
       <br />
-      <span  style="font-size: 20px"> ordered -> {{ elevatorsOrder }} </span>
-      {{ elevators }}
+      <span  style="font-size: 10px"> schedule -> {{ schedule }} </span>
+      <!-- {{ elevators }} -->
+      <!-- {{ floors }} -->
     </span>
 </pre>
     <table class="center">
       <tr v-for="(floor, i_row) in floors" :key="i_row">
         <td v-for="i_col in 7" :key="i_col" :style="tdStyle(i_col)">
+          <strong
+            v-if="
+              1 == 2 &&
+              floor.btnText == 'waiting' &&
+              ![1, 7].includes(i_col) &&
+              floor.elevator.includes(String(i_col))
+            "
+            >{{ floor.elevator }},
+            {{ floor.elevator.includes(String(i_col)) }} , {{ i_col }}</strong
+          >
           <span type="success" size="mini" v-if="i_col == 1">
             {{ floorText(i_row) }}</span
           >
 
           <el-button
-            @click="callElevator(i_row)"
+            @click="onClickCall(i_row)"
             :disabled="floor.btnText != 'Call'"
             :type="floor.btnText == 'waiting' ? 'danger' : 'success'"
             size="mini"
@@ -64,19 +75,21 @@ export default {
         marginTop: -11,
         availible: true,
         floor: 0,
+        orderTime: "",
         timeCount: null,
         interval: null,
       };
     }
 
     let floors = new Array(10).fill(1).map(() => {
-      return { btnText: "Call" };
+      return { btnText: "Call", elevator: [] };
     });
 
     return {
       floors,
       elevators,
       time: 0,
+      schedule: [],
       isRunning: false,
       elevatorsOrder: [],
       queue: [],
@@ -98,9 +111,10 @@ export default {
       }
     },
     pushToQueue(i_row) {
-      if (!this.queue.includes(i_row)) {
-        this.queue.push(i_row);
-      }
+      // if (!this.queue.includes(i_row)) {
+      this.queue.push(i_row);
+
+      // }
     },
     findAvailableElev(i_row) {
       //initial distance check
@@ -147,8 +161,12 @@ export default {
       this.elevators[aei].timeCount =
         parseInt(this.elevators[aei].timeCount) + 1;
     },
-
-    async callElevator(i_row) {
+    onClickCall(i_row) {
+      let orderTime = new Date().getTime();
+      this.schedule.push({ floor: i_row, orderTime });
+      this.callElevator(i_row, orderTime);
+    },
+    async callElevator(i_row, orderTime = "") {
       this.floors[i_row].btnText = "waiting";
 
       let aei; //availableElevatorIndex
@@ -178,7 +196,7 @@ export default {
       //Elevator is moving ...⏫
       const elevator = this.elevators[aei];
       // this.toggleTimer(aei);
-      this.elevatorsOrder = this.elevatorsOrder.filter((o) => o != aei);
+      this.elevatorsOrder = this.elevatorsOrder.filter((o) => o != String(aei));
       this.elevatorsOrder.push(aei);
       elevator.interval = setInterval(function () {
         if (!elevator.timeCount) elevator.timeCount = 0;
@@ -186,7 +204,9 @@ export default {
       }, 100);
       elevator.availible = false;
       elevator.color = "red";
+      elevator.orderTime = orderTime;
       elevator.floor = this.floors.length - 1 - i_row;
+      this.floors[elevator.floor].elevator.push(aei);
       elevator.marginTop = -1 * (this.floors.length - 1 - i_row) * 53 - 11;
 
       await setTimeout(() => {
@@ -198,16 +218,16 @@ export default {
         return this.onArrive(i_row, elevator);
       }, 6000);
     },
-    playSound(sound) {
+    playSound(
+      sound = "http://soundbible.com/mp3/Elevator Ding-SoundBible.com-685385892.mp3"
+    ) {
       if (sound) {
         var audio = new Audio(sound);
         audio.play();
       }
     },
-    async onArrive(i_row, elevator) {
-      this.playSound(
-        "http://soundbible.com/mp3/Elevator Ding-SoundBible.com-685385892.mp3"
-      );
+    async onArrive(i_row, elevator, aei) {
+      this.playSound();
       await setTimeout(() => {
         if (this.queue.length) {
           let queueNum = this.queue[0];
@@ -216,6 +236,9 @@ export default {
         }
 
         this.floors[i_row].btnText = "Call";
+        this.floors[i_row].elevator = this.floors[i_row].elevator.filter(
+          (e) => e != aei
+        );
         // this.floors[i_row].disabled = false;
         elevator.color = "black";
         elevator.availible = true;
