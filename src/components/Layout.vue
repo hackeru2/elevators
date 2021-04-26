@@ -1,11 +1,17 @@
 <template>
   <div>
-    <span class="p-abs" style="left: 4px; top: 4px"
-      >Time to Arrive:{{ time }}
-      <br />
-      <span> queue -> {{ queue }} </span></span
+    <pre>
+    <span
+      class="p-abs"
+      style="left: 4px; top: 4px; width: 100px; font-size: 10px"
     >
-
+      <br />
+      <span  style="font-size: 20px"> queue -> {{ queue }} </span>
+      <br />
+      <span  style="font-size: 20px"> ordered -> {{ elevatorsOrder }} </span>
+      {{ elevators }}
+    </span>
+</pre>
     <table class="center">
       <tr v-for="(floor, i_row) in floors" :key="i_row">
         <td v-for="i_col in 7" :key="i_col" :style="tdStyle(i_col)">
@@ -27,6 +33,19 @@
             :color="elevators[i_col].color"
             :style="`margin-top:${elevators[i_col].marginTop}px`"
           />
+          <b
+            style="line-height: 1vw"
+            class="p-abs"
+            v-if="
+              elevators[i_col] && elevators[i_col].floor == floorsLength - i_row
+            "
+          >
+            <!-- {{ elevators[i_col].floor }} -->
+            <strong>
+              <br />
+              {{ elevators[i_col].timeCount }}
+            </strong>
+          </b>
         </td>
       </tr>
     </table>
@@ -43,9 +62,10 @@ export default {
     for (let i = 2; i <= 6; i++) {
       elevators[i] = {
         marginTop: -11,
-        class: "",
         availible: true,
         floor: 0,
+        timeCount: null,
+        interval: null,
       };
     }
 
@@ -58,7 +78,7 @@ export default {
       elevators,
       time: 0,
       isRunning: false,
-      interval: "",
+      elevatorsOrder: [],
       queue: [],
     };
   },
@@ -78,38 +98,59 @@ export default {
       }
     },
     pushToQueue(i_row) {
-      this.queue.push(i_row);
+      if (!this.queue.includes(i_row)) {
+        this.queue.push(i_row);
+      }
     },
     findAvailableElev(i_row) {
-      for (let key in this.elevators) {
-        let values = this.elevators[key];
-        console.log(
-          "distance",
-          Math.abs(this.floorsLength - i_row - values.floor)
+      //initial distance check
+
+      let availableElevators = Object.entries(this.elevators).filter(
+        (elev) => elev[1].availible
+      );
+      if (!availableElevators.length) throw "all Occupied";
+      let closestKey = availableElevators[0][0];
+      let distance = Math.abs(
+        this.floorsLength - i_row - availableElevators[0][1].floor
+      );
+
+      availableElevators.forEach((ae) => {
+        let nextDistanceCheck = Math.abs(
+          this.floorsLength - i_row - ae[1].floor
         );
-        if (values.availible) return key;
-      }
-      throw "all Occupied";
-    },
-    toggleTimer() {
-      return console.log("dfg");
-      // this.interval = setInterval(this.incrementTime, 1);
-      // if (this.isRunning) {
-      //   //debugger
-      //   clearInterval(this.interval);
-      //   console.log("timer stops");
-      // } else {
-      //   console.log("timer starts");
+        console.log({ nextDistanceCheck });
+        if (distance > nextDistanceCheck) {
+          distance = nextDistanceCheck;
+          closestKey = ae[0];
+        }
+      });
+      console.log({ distance, closestKey });
+      return closestKey;
+      // for (let key in this.elevators) {
+      //   let values = this.elevators[key];
+
+      //     let nextDistanceCheck = Math.abs(this.floorsLength - i_row - values.floor)
+
       // }
-      // this.isRunning = this.isRunning ? false : true;
     },
-    incrementTime() {
-      this.time = parseInt(this.time) + 1;
+    toggleTimer(aei) {
+      let _this = this;
+      this.elevators[aei].interval = setInterval(
+        () => _this.incrementTime(aei),
+        100
+      );
+
+      //debugger
+    },
+    incrementTime(aei) {
+      if (!this.elevators[aei].timeCount) this.elevators[aei].timeCount = 0;
+      this.elevators[aei].timeCount =
+        parseInt(this.elevators[aei].timeCount) + 1;
     },
 
     async callElevator(i_row) {
       this.floors[i_row].btnText = "waiting";
-      this.toggleTimer();
+
       let aei; //availableElevatorIndex
       try {
         aei = this.findAvailableElev(i_row);
@@ -119,48 +160,66 @@ export default {
       }
       console.log({ aei });
 
-      // this.floors[i_row].disabled = true;
-
       try {
         this.isElevatorOnTheFloor(i_row);
       } catch (key) {
-        // alert(key);
         aei = key;
         this.elevators[aei].color = "green";
         setTimeout(() => {
           this.elevators[aei].availible = true;
-          // this.floors[i_row].disabled = false;
+
           this.floors[i_row].btnText = "Call";
           this.elevators[aei].color = "black";
-        }, 1000);
+        }, 200);
 
         return console.log("elevator was on the floor");
       }
-      this.elevators[aei].availible = false;
-      this.elevators[aei].color = "red";
-      this.elevators[aei].floor = this.floors.length - 1 - i_row;
-      this.elevators[aei].marginTop =
-        -1 * (this.floors.length - 1 - i_row) * 53 - 11;
+
+      //Elevator is moving ...⏫
+      const elevator = this.elevators[aei];
+      // this.toggleTimer(aei);
+      this.elevatorsOrder = this.elevatorsOrder.filter((o) => o != aei);
+      this.elevatorsOrder.push(aei);
+      elevator.interval = setInterval(function () {
+        if (!elevator.timeCount) elevator.timeCount = 0;
+        elevator.timeCount++;
+      }, 100);
+      elevator.availible = false;
+      elevator.color = "red";
+      elevator.floor = this.floors.length - 1 - i_row;
+      elevator.marginTop = -1 * (this.floors.length - 1 - i_row) * 53 - 11;
 
       await setTimeout(() => {
         this.floors[i_row].btnText = "Arrived";
-        clearInterval(this.interval);
-        // this.isRunning = false;
-        this.elevators[aei].color = "green";
-        return this.onArrive(i_row, aei);
+
+        elevator.color = "green";
+        clearInterval(elevator.interval);
+        elevator.interval = null;
+        return this.onArrive(i_row, elevator);
       }, 6000);
     },
-    async onArrive(i_row, aei) {
+    playSound(sound) {
+      if (sound) {
+        var audio = new Audio(sound);
+        audio.play();
+      }
+    },
+    async onArrive(i_row, elevator) {
+      this.playSound(
+        "http://soundbible.com/mp3/Elevator Ding-SoundBible.com-685385892.mp3"
+      );
       await setTimeout(() => {
         if (this.queue.length) {
           let queueNum = this.queue[0];
           this.queue.shift();
           this.callElevator(queueNum);
         }
+
         this.floors[i_row].btnText = "Call";
         // this.floors[i_row].disabled = false;
-        this.elevators[aei].color = "black";
-        this.elevators[aei].availible = true;
+        elevator.color = "black";
+        elevator.availible = true;
+        elevator.timeCount = 0;
       }, 2000);
     },
     floorText(i_row) {
@@ -204,8 +263,8 @@ a {
   text-align: center;
   width: 20px;
   height: 20px;
-  transition: margin 6000ms ease;
-  transition-timing-function: cubic-bezier(0.42, 0, 0.2, 1);
+  transition: margin 6000ms ease-out;
+  /* transition-timing-function: cubic-bezier(0.42, 0, 0.2, 1); */
   display: inline-block;
   margin-top: 0px;
   margin-left: -9px;
