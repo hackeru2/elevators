@@ -75,7 +75,7 @@ export default {
         marginTop: -11,
         availible: true,
         floor: 0,
-        orderTime: "",
+        orders: [],
         timeCount: null,
         interval: null,
       };
@@ -89,7 +89,7 @@ export default {
       floors,
       elevators,
       time: 0,
-      schedule: [],
+      schedule: {},
       isRunning: false,
       elevatorsOrder: [],
       queue: [],
@@ -97,6 +97,17 @@ export default {
   },
   name: "Layout",
   computed: {
+    minOrderTime() {
+      try {
+        let ov = Object.values(this.schedule)
+          .filter((o) => !o.assigned)
+          .map((o) => o.orderTime);
+        ov = Math.min(...ov);
+        return ov;
+      } catch (error) {
+        return false;
+      }
+    },
     floorsLength() {
       return this.floors.length - 1;
     },
@@ -110,11 +121,19 @@ export default {
           throw key;
       }
     },
-    pushToQueue(i_row) {
-      // if (!this.queue.includes(i_row)) {
-      this.queue.push(i_row);
+    pushToQueue(i_row, orderTime) {
+      const { queue, schedule, minOrderTime, elevators } = this;
 
-      // }
+      // if (!this.queue.includes(i_row)) {
+      queue.push(i_row);
+
+      if (!orderTime) return;
+      let aei = schedule[minOrderTime].elevator;
+      schedule[orderTime].status = "queue";
+      schedule[orderTime].elevator = aei;
+      elevators[aei].orders.push(orderTime);
+      schedule[minOrderTime].assigned = true;
+      console.log({ schedule_minOrderTime: schedule[minOrderTime] });
     },
     findAvailableElev(i_row) {
       //initial distance check
@@ -163,7 +182,7 @@ export default {
     },
     onClickCall(i_row) {
       let orderTime = new Date().getTime();
-      this.schedule.push({ floor: i_row, orderTime });
+      this.schedule[orderTime] = { floor: i_row, orderTime };
       this.callElevator(i_row, orderTime);
     },
     async callElevator(i_row, orderTime = "") {
@@ -173,14 +192,15 @@ export default {
       try {
         aei = this.findAvailableElev(i_row);
       } catch (error) {
-        console.log(error);
-        return this.pushToQueue(i_row);
+        // console.log(error);
+        return this.pushToQueue(i_row, orderTime);
       }
-      console.log({ aei });
+      // console.log({ aei });
 
       try {
         this.isElevatorOnTheFloor(i_row);
       } catch (key) {
+        delete this.schedule[orderTime];
         aei = key;
         this.elevators[aei].color = "green";
         setTimeout(() => {
@@ -194,6 +214,7 @@ export default {
       }
 
       //Elevator is moving ...⏫
+
       const elevator = this.elevators[aei];
       // this.toggleTimer(aei);
       this.elevatorsOrder = this.elevatorsOrder.filter((o) => o != String(aei));
@@ -204,7 +225,12 @@ export default {
       }, 100);
       elevator.availible = false;
       elevator.color = "red";
-      elevator.orderTime = orderTime;
+      // elevator.orderTime = orderTime;
+
+      if (this.schedule[orderTime]) {
+        this.schedule[orderTime].elevator = aei;
+        this.schedule[orderTime].status = "waiting";
+      }
       elevator.floor = this.floors.length - 1 - i_row;
       this.floors[elevator.floor].elevator.push(aei);
       elevator.marginTop = -1 * (this.floors.length - 1 - i_row) * 53 - 11;
@@ -215,7 +241,7 @@ export default {
         elevator.color = "green";
         clearInterval(elevator.interval);
         elevator.interval = null;
-        return this.onArrive(i_row, elevator);
+        return this.onArrive(i_row, elevator, orderTime);
       }, 6000);
     },
     playSound(
@@ -226,8 +252,10 @@ export default {
         audio.play();
       }
     },
-    async onArrive(i_row, elevator, aei) {
+    async onArrive(i_row, elevator, orderTime) {
+      if (this.schedule[orderTime]) this.schedule[orderTime].status = "arrived";
       this.playSound();
+
       await setTimeout(() => {
         if (this.queue.length) {
           let queueNum = this.queue[0];
@@ -236,13 +264,12 @@ export default {
         }
 
         this.floors[i_row].btnText = "Call";
-        this.floors[i_row].elevator = this.floors[i_row].elevator.filter(
-          (e) => e != aei
-        );
-        // this.floors[i_row].disabled = false;
+
         elevator.color = "black";
         elevator.availible = true;
         elevator.timeCount = 0;
+        elevator.orders = elevator.orders.filter((ot) => ot != orderTime);
+        delete this.schedule[orderTime];
       }, 2000);
     },
     floorText(i_row) {
