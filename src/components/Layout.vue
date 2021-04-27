@@ -1,28 +1,16 @@
 <template>
   <div>
-    <pre>
-    <span
-      class="p-abs"
-      style="left: 4px; top: 4px; width: 100px; font-size: 10px"
-    >
-      <br />
-      <!-- <span  style="font-size: 10px;right:0;position:fixed"> elevators -> {{ elevators }} </span> -->
-      <br />
-      <!-- <span  style="font-size: 10px"> schedule -> {{ Object.values(schedule).map(e=>e.elevator) }} </span> -->
-      <!-- {{ elevators }} -->
-      <!-- {{ floors }} -->
-    </span>
-</pre>
     <table class="center">
       <tr v-for="(floor, i_row) in floors" :key="i_row">
         <td v-for="i_col in columns" :key="i_col" :style="tdStyle(i_col)">
-          <strong class="p-abs"> <br />{{ print(i_col, i_row) }} </strong>
+          <strong class="p-abs"> {{ print(i_col, i_row) }} </strong>
           <span v-html="floorText(i_row, i_col)" />
           <el-button
             @click="onClickCall(i_row)"
             :disabled="floor.btnText != 'Call'"
             :type="floor.btnText == 'waiting' ? 'danger' : 'success'"
             size="mini"
+            :plain="floor.btnText == 'Arrived'"
             v-if="i_col == columns"
             >{{ floor.btnText }}</el-button
           >
@@ -32,19 +20,6 @@
             :color="elevators[i_col].color"
             :style="`margin-top:${elevators[i_col].marginTop}px`"
           />
-          <!-- <b
-            style="line-height: 1vw"
-            class="p-abs"
-            v-if="
-              elevators[i_col] && elevators[i_col].floor == floorsLength - i_row
-            "
-          >
-         
-            <strong>
-              <br />
-              {{ elevators[i_col].timeCount }}
-            </strong>
-          </b> -->
         </td>
       </tr>
     </table>
@@ -53,14 +28,22 @@
 
 <script>
 import SomeIcon from "../assets/SomeIcon";
-
+const startMargin = -31;
 export default {
   components: { SomeIcon },
   data() {
-    let elevators = {};
-    for (let i = 2; i <= 10; i++) {
-      elevators[i] = {
-        marginTop: -11,
+    return {
+      floors: [],
+      elevators: {},
+      schedule: {},
+      queue: [],
+    };
+  },
+  name: "Layout",
+  created() {
+    for (let i = 2; i <= 6; i++) {
+      this.elevators[i] = {
+        marginTop: startMargin,
         availible: true,
         floor: 0,
         // orders: [],
@@ -69,21 +52,10 @@ export default {
       };
     }
 
-    let floors = new Array(10).fill(1).map(() => {
+    this.floors = new Array(25).fill(1).map(() => {
       return { btnText: "Call" };
     });
-
-    return {
-      floors,
-      elevators,
-      time: 0,
-      schedule: {},
-      isRunning: false,
-      elevatorsOrder: [],
-      queue: [],
-    };
   },
-  name: "Layout",
   computed: {
     columns() {
       return Object.keys(this.elevators).length + 2;
@@ -126,7 +98,7 @@ export default {
         (s) =>
           s.time && s.floor == i_row && s.elevator == i_col && s.status != "end"
       );
-      if (scheduleOrder) return (scheduleOrder.time / 10).toFixed(1);
+      if (scheduleOrder) return (scheduleOrder.time / 10).toFixed(1) + "Sec";
 
       // else return this.nextElevator;
       // if (scheduleOrder) return scheduleOrder.orderTime;
@@ -252,7 +224,8 @@ export default {
       }
       elevator.floor = this.floors.length - 1 - i_row;
 
-      elevator.marginTop = -1 * (this.floors.length - 1 - i_row) * 53 - 11;
+      elevator.marginTop =
+        -1 * (this.floors.length - 1 - i_row) * 53 + startMargin;
 
       await setTimeout(() => {
         this.floors[i_row].btnText = "Arrived";
@@ -304,7 +277,7 @@ export default {
         return "border:0px";
       } else if (i_col == 1) {
         return "border:0px;text-align:end;padding-right:8px";
-      }
+      } else return "vertical-align:bottom";
     },
   },
 
@@ -345,10 +318,10 @@ a {
 
 td {
   width: 10vw;
-  /* max-width: 180px; */
-  /* vertical-align: bottom;
-  text-align: center; */
-  margin: 0;
+  /* max-width: 180px;  */
+  /* vertical-align: bottom; */
+  text-align: center;
+  /* margin: 0; */
 }
 td,
 tr {
