@@ -1,9 +1,12 @@
 <template>
   <div>
-    <table class="center">
+    <el-button type="primary" class="reset-btn" @click="$emit('reset')"
+      >Reset</el-button
+    >
+    <table>
       <tr v-for="(floor, i_row) in floors" :key="i_row">
         <td v-for="i_col in columns" :key="i_col" :style="tdStyle(i_col)">
-          <strong class="p-abs"> {{ print(i_col, i_row) }} </strong>
+          <strong class="p-abs"> {{ printTime(i_col, i_row) }} </strong>
           <span v-html="floorText(i_row, i_col)" />
           <el-button
             @click="onClickCall(i_row)"
@@ -31,6 +34,7 @@ import SomeIcon from "../assets/SomeIcon";
 const startMargin = -31;
 export default {
   components: { SomeIcon },
+  props: ["form"],
   data() {
     return {
       floors: [],
@@ -41,22 +45,38 @@ export default {
   },
   name: "Layout",
   created() {
-    for (let i = 2; i <= 6; i++) {
+    for (let i = 2; i <= this.elevatorsNumber + 1; i++) {
       this.elevators[i] = {
         marginTop: startMargin,
         availible: true,
         floor: 0,
-        // orders: [],
-        // timeCount: null,
-        // interval: null,
       };
     }
 
-    this.floors = new Array(25).fill(1).map(() => {
+    this.floors = new Array(this.floorsNumber).fill(1).map(() => {
       return { btnText: "Call" };
     });
   },
   computed: {
+    floorsNumber() {
+      try {
+        if (!this.form.floors) throw "empty";
+        return this.form.floors;
+      } catch (error) {
+        return 10;
+      }
+    },
+    elevatorsNumber() {
+      try {
+        if (!this.form.elevators) throw "empty";
+        return this.form.elevators;
+      } catch (error) {
+        return 5;
+      }
+    },
+    scheduledLength() {
+      return Object.keys(this.schedule).length;
+    },
     columns() {
       return Object.keys(this.elevators).length + 2;
     },
@@ -68,22 +88,16 @@ export default {
         return true;
       });
     },
-    scheduledQueue() {
-      try {
-        return Object.values(this.schedule).filter((s) => s.status == "queue");
-      } catch (error) {
-        return false;
-      }
-    },
-    minOrderTime() {
-      let ov = Object.values(this.schedule)
-        .filter((o) => !o.assigned)
-        .map((o) => o.orderTime);
-      ov = Math.min(...ov);
-      return ov;
-    },
     floorsLength() {
       return this.floors.length - 1;
+    },
+  },
+  watch: {
+    scheduledLength() {
+      let keys = Object.values(this.schedule)
+        .filter((s) => s.status == "end")
+        .map((s) => s.orderTime);
+      keys.forEach((k) => delete this.schedule[k]);
     },
   },
   methods: {
@@ -92,16 +106,13 @@ export default {
 
       console.log({ entries });
     },
-    print(i_col, i_row) {
+    printTime(i_col, i_row) {
       if ([1, this.columns].includes(i_col)) return "";
       let scheduleOrder = Object.values(this.schedule).find(
         (s) =>
           s.time && s.floor == i_row && s.elevator == i_col && s.status != "end"
       );
       if (scheduleOrder) return (scheduleOrder.time / 10).toFixed(1) + "Sec";
-
-      // else return this.nextElevator;
-      // if (scheduleOrder) return scheduleOrder.orderTime;
     },
     isElevatorOnTheFloor(i_row) {
       for (let key in this.elevators) {
@@ -111,16 +122,7 @@ export default {
           throw key;
       }
     },
-    // pushToQueue(i_row, orderTime) {
-    //   // const { schedule, minOrderTime, elevators } = this;
-    //   // if (!minOrderTime) alert("sdfsfsfdeeee");
-    //   // // if (!this.queue.includes(i_row)) {
-    //   // // queue.push(i_row);
-    //   // if (elevators[aei].orders.includes(orderTime)) return;
-    //   // elevators[aei].orders.push(orderTime);
-    //   // schedule[minOrderTime].assigned = true;
-    //   // console.log({ schedule_minOrderTime: schedule[minOrderTime] });
-    // },
+
     findAvailableElev(i_row) {
       //initial distance check
 
@@ -169,19 +171,15 @@ export default {
     },
     async callElevator(i_row, orderTime = "") {
       this.floors[i_row].btnText = "waiting";
-
       let aei; //availableElevatorIndex
       try {
         aei = this.findAvailableElev(i_row);
       } catch (error) {
         // this.assignElevator(i_row, orderTime);
         this.schedule[orderTime].elevator = this.nextElevatorSchedule.elevator;
-        setTimeout(() => {
-          this.schedule[this.nextElevatorSchedule.orderTime].assigned = true;
-        }, 50);
-        // console.log(error);
+        this.schedule[this.nextElevatorSchedule.orderTime].assigned = true;
+
         return;
-        // return this.pushToQueue(i_row, orderTime);
       }
       // console.log({ aei });
 
@@ -194,7 +192,7 @@ export default {
         this.elevators[aei].color = "green";
         setTimeout(() => {
           this.elevators[aei].availible = true;
-
+          delete this.schedule[orderTime];
           this.floors[i_row].btnText = "Call";
           this.elevators[aei].color = "black";
         }, 200);
@@ -205,17 +203,8 @@ export default {
       //Elevator is moving ...⏫⏫
 
       const elevator = this.elevators[aei];
-      // this.toggleTimer(aei);
-      this.elevatorsOrder = this.elevatorsOrder.filter((o) => o != String(aei));
-      this.elevatorsOrder.push(aei);
-      // elevator.interval = setInterval(function () {
-      //   if (!elevator.timeCount) elevator.timeCount = 0;
-      //   elevator.timeCount++;
-      // }, 100);
       elevator.availible = false;
       elevator.color = "red";
-      // elevator.orders.push(orderTime);
-      // elevator.orderTime = orderTime;
 
       if (this.schedule[orderTime]) {
         this.schedule[orderTime].elevator = aei;
@@ -236,21 +225,20 @@ export default {
         return this.onArrive(i_row, elevator, orderTime, aei);
       }, 6000);
     },
-    playSound(
-      sound = "http://soundbible.com/mp3/Elevator Ding-SoundBible.com-685385892.mp3"
-    ) {
-      if (sound) {
-        var audio = new Audio(sound);
-        audio.volume = 0.2;
-        audio.play();
-      }
+
+    playSound() {
+      var audio = new Audio(
+        "http://soundbible.com/mp3/Elevator Ding-SoundBible.com-685385892.mp3"
+      );
+      audio.volume = 0.2;
+      audio.play();
     },
+
     async onArrive(i_row, elevator, orderTime, aei) {
       this.playSound();
       clearInterval(this.schedule[orderTime].interval);
 
       await setTimeout(() => {
-        // this.callElevator(i_row);
         console.log({ aei });
         let queues = Object.values(this.schedule).filter(
           (s) => s.status == "queue"
@@ -260,8 +248,7 @@ export default {
 
         elevator.color = "black";
         elevator.availible = true;
-        // elevator.timeCount = 0;
-        // elevator.orders = elevator.orders.filter((ot) => ot != orderTime);
+
         this.schedule[orderTime].status = "end";
         if (queues.length)
           return this.callElevator(queues[0].floor, queues[0].orderTime);
@@ -273,37 +260,22 @@ export default {
       return `${this.floorsLength - i_row}th`;
     },
     tdStyle(i_col) {
-      if (i_col == 7) {
-        return "border:0px";
+      if (i_col == this.columns) {
+        return "border:0px;background-color:lightgray";
       } else if (i_col == 1) {
-        return "border:0px;text-align:end;padding-right:8px";
-      } else return "vertical-align:bottom";
+        return "font-size:12px;text-align:end;padding-right:8px;background-color:lightgray;font-weight:700";
+      } else return "vertical-align:bottom;background-color:white";
     },
   },
-
-  props: {
-    msg: String,
+  beforeUnmount() {
+    this.floors = [];
+    this.elevators = {};
+    this.schedule = {};
   },
 };
 </script>
-
-<!-- Add "scoped" attribute to limit CSS to this component only -->
+ 
 <style scoped>
-h3 {
-  /* margin: 40px 0 0; */
-}
-ul {
-  list-style-type: none;
-  padding: 0;
-}
-li {
-  display: inline-block;
-  /* margin: 0 20px; */
-}
-a {
-  color: #42b983;
-}
-
 .my-icon {
   position: absolute;
   text-align: center;
@@ -318,10 +290,7 @@ a {
 
 td {
   width: 10vw;
-  /* max-width: 180px;  */
-  /* vertical-align: bottom; */
   text-align: center;
-  /* margin: 0; */
 }
 td,
 tr {
@@ -331,35 +300,35 @@ table,
 td,
 tr,
 th {
-  border: 0.5px solid lightgray;
+  border: 0.5px solid lightgray !important;
 }
 table {
   font-size: 1vw !important;
-  border-collapse: collapse;
-}
-table.center {
+  border-collapse: collapse !important;
   margin-left: auto;
   margin-right: auto;
 }
-/* svg {
-  fill: rgb(0, 0, 0);
-} */
-.stroke-red,
-.stroke-red[path] {
-  stroke: tomato;
-  color: tomato;
-  fill: tomato;
-}
+
 .el-button--mini {
-  /* font-size: 1vw !important; */
-  /* padding: 1vw !important; */
+  font-weight: 700;
   min-height: unset !important;
+  font-size: 10px !important;
+  min-width: 62px;
 }
 .p-abs {
   margin-top: -10px;
   margin-left: -8px;
-  font-size: 0.8vw;
+  font-size: 8px;
   position: absolute;
+}
+.reset-btn {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  padding: 15px;
+}
+.el-button--danger.is-disabled {
+  background-color: red !important;
 }
 </style>
 

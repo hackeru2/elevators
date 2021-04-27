@@ -2,8 +2,10 @@
   <div>
     <p>Elevator Excersize</p>
   </div>
-  <Entrance />
-  <Layout msg="Welcome to Your Vue.js App" />
+  <transition name="el-fade-in" mode="out-in">
+    <Entrance v-if="!form" @submit="(f) => (form = f)" />
+    <Layout :form="form" v-else @reset="form = ''" />
+  </transition>
 </template>
 
 <script>
@@ -12,6 +14,11 @@ import Entrance from "./components/Entrance";
 
 export default {
   name: "App",
+  data() {
+    return {
+      form: "",
+    };
+  },
   components: {
     Entrance,
     Layout,
@@ -26,7 +33,11 @@ export default {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-align: center;
-  color: #2c3e50;
-  margin-top: 60px;
+  padding: 20px;
+  min-height: 80vh;
+  background-color: lightgray;
+}
+p {
+  font-weight: 700;
 }
 </style>
