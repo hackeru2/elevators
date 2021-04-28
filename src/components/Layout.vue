@@ -162,8 +162,12 @@ export default {
       };
 
       _this.schedule[orderTime].interval = setInterval(function () {
-        if (_this.schedule[orderTime].time > 500)
+        if (_this.schedule[orderTime].time > 1200) {
+          _this.$message(
+            `Stop counting elevator ${_this.schedule[orderTime].interval} if exceeds 2 minutes`
+          );
           clearInterval(_this.schedule[orderTime].interval);
+        }
         _this.schedule[orderTime].time++;
       }, 100);
 
@@ -214,7 +218,7 @@ export default {
       elevator.floor = this.floors.length - 1 - i_row;
 
       elevator.marginTop =
-        -1 * (this.floors.length - 1 - i_row) * 53 + startMargin;
+        -1 * (this.floors.length - 1 - i_row) * 52.045 + startMargin;
 
       await setTimeout(() => {
         this.floors[i_row].btnText = "Arrived";
